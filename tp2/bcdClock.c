@@ -116,17 +116,18 @@ void init() {
 	SWS_DDR = 0x00;
 
 	//Set OCR1A
-	OCR1A = 0x02E1;
+	OCR1A = 0x1200;
 	//Set DDRC as output for leds
 	//Set timer to CTC1
 	TCCR1B |= (1 << WGM12);
 	//Set interruption to OCR1A
 	TIMSK |= (1 << OCIE1A);
 	//Set prescaler to clk/64
-	//TCCR1B |= (1 << CS11) | (1<<CS10);
+	TCCR1B |= (1 << CS11);
 
 	hs = min = sec = ths = tmin = tsec = count = 0;
 	current_state = s_sec;
+	leds_off();
 }
 
 int main() {
@@ -136,45 +137,91 @@ int main() {
 	sei();
 	uint8_t sws;
 	forever{
-//		sws = SWS_PIN;
-//		if(sws != SWS_NONE) {
-//			if(current_state == s_ssec ||
-//					current_state == s_smin ||
-//					current_state == s_ssec) {
-//				cli();
-//				if(sws == SWS_FOURTH) {
-//					down();
-//				}
-//				else if(sws == SWS_FIFTH) {
-//					up();
-//				}
-//				sei();
-//			}
-//			switch(sws)
-//			{
-//			case SWS_FIRST:
-//				current_state = s_sec;
-//				break;
-//			case SWS_SECOND:
-//				current_state = s_min;
-//				break;
-//			case SWS_THIRD:
-//				current_state = s_hour;
-//				break;
-//			case SWS_SIXTH:
-//				current_state = s_ssec;
-//				break;
-//			case SWS_SEVENTH:
-//				current_state = s_smin;
-//				break;
-//			case SWS_EIGHT:
-//				current_state = s_shour;
-//				break;
-//			}
-//
-//		}
-//		plot();
-		//_delay_ms(100);
+		sws = SWS_PIN;
+		if(sws != SWS_NONE) {
+			if(current_state == s_ssec ||
+					current_state == s_smin ||
+					current_state == s_shour) {
+				if(sws == SWS_FOURTH) {
+					down();
+				}
+				else if(sws == SWS_FIFTH) {
+					up();
+				}
+			}
+			switch(sws)
+			{
+			case SWS_FIRST:
+				if(current_state == s_ssec ||
+						current_state == s_smin ||
+						current_state == s_shour)
+				{
+					tsec = sec;
+					tmin = min;
+					ths = hs;
+					sei();
+				}
+				current_state = s_sec;
+				break;
+			case SWS_SECOND:
+				if(current_state == s_ssec ||
+						current_state == s_smin ||
+						current_state == s_shour)
+				{
+					tsec = sec;
+					tmin = min;
+					ths = hs;
+					sei();
+				}
+				current_state = s_min;
+				break;
+			case SWS_THIRD:
+				if(current_state == s_ssec ||
+						current_state == s_smin ||
+						current_state == s_shour)
+				{
+					tsec = sec;
+					tmin = min;
+					ths = hs;
+					sei();
+				}
+				current_state = s_hour;
+				break;
+			case SWS_SIXTH:
+				if(current_state == s_sec ||
+						current_state == s_min ||
+						current_state == s_hour)
+				{
+					time_updated = false;
+					cli();
+				}
+				current_state = s_ssec;
+				break;
+			case SWS_SEVENTH:
+				if(current_state == s_sec ||
+						current_state == s_min ||
+						current_state == s_hour)
+				{
+					time_updated = false;
+					cli();
+				}
+				current_state = s_smin;
+				break;
+			case SWS_EIGHT:
+				if(current_state == s_sec ||
+						current_state == s_min ||
+						current_state == s_hour)
+				{
+					time_updated = false;
+					cli();
+				}
+				current_state = s_shour;
+				break;
+			}
+
+		}
+		plot();
+		_delay_ms(300);
 	}
 
 	return 0;
@@ -182,8 +229,8 @@ int main() {
 
 ISR (TIMER1_COMPA_vect) {
 	if(++count == SEC_COUNT) {
-		LEDS_PORT = ~LEDS_PORT;
-//		update_time();
+		count = 0;
+		update_time();
 	}
 }
 
@@ -203,9 +250,11 @@ void update_time() {
 void plot() {
 	if(time_updated)
 	{
+		cli();
 		sec = tsec;
 		min = tmin;
 		hs = ths;
+		sei();
 	}
 	leds_off();
 	switch(current_state)
@@ -226,22 +275,65 @@ void plot() {
 }
 
 void up() {
-	sec++;
-	if( (sec%=60) == 0)
+	switch(current_state)
 	{
+	case s_ssec:
+		sec++;
+		if( (sec%=60) == 0)
+		{
+			min++;
+			if((min%=60) == 0)
+			{
+				hs++;
+				hs %= 24;
+			}
+		}
+		break;
+	case s_smin:
 		min++;
 		if((min%=60) == 0)
 		{
 			hs++;
 			hs %= 24;
 		}
+		break;
+	case s_shour:
+		hs++;
+		hs %= 24;
+		break;
 	}
 }
 
 void down() {
-	if( sec == 0)
+	switch(current_state)
 	{
-		sec = 59;
+	case s_ssec:
+		if( sec == 0)
+		{
+			sec = 59;
+			if(min == 0)
+			{
+				min = 59;
+				if (hs == 0)
+				{
+					hs = 23;
+				}
+				else
+				{
+					hs--;
+				}
+			}
+			else
+			{
+				min--;
+			}
+		}
+		else
+		{
+			sec--;
+		}
+		break;
+	case s_smin:
 		if(min == 0)
 		{
 			min = 59;
@@ -258,9 +350,16 @@ void down() {
 		{
 			min--;
 		}
-	}
-	else
-	{
-		sec--;
+		break;
+	case s_shour:
+		if (hs == 0)
+		{
+			hs = 23;
+		}
+		else
+		{
+			hs--;
+		}
+		break;
 	}
 }

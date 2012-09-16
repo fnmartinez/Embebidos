@@ -35,12 +35,6 @@ endif
 LSS += \
 Embebidos.lss \
 
-FLASH_IMAGE += \
-Embebidos.hex \
-
-EEPROM_IMAGE += \
-Embebidos.eep \
-
 SIZEDUMMY += \
 sizedummy \
 
@@ -62,18 +56,6 @@ Embebidos.lss: Embebidos.elf
 	@echo 'Finished building: $@'
 	@echo ' '
 
-Embebidos.hex: Embebidos.elf
-	@echo 'Create Flash image (ihex format)'
-	-avr-objcopy -R .eeprom -O ihex Embebidos.elf  "Embebidos.hex"
-	@echo 'Finished building: $@'
-	@echo ' '
-
-Embebidos.eep: Embebidos.elf
-	@echo 'Create eeprom image (ihex format)'
-	-avr-objcopy -j .eeprom --no-change-warnings --change-section-lma .eeprom=0 -O ihex Embebidos.elf  "Embebidos.eep"
-	@echo 'Finished building: $@'
-	@echo ' '
-
 sizedummy: Embebidos.elf
 	@echo 'Invoking: Print Size'
 	-avr-size --format=avr --mcu=atmega8515 Embebidos.elf
@@ -82,10 +64,10 @@ sizedummy: Embebidos.elf
 
 # Other Targets
 clean:
-	-$(RM) $(OBJS)$(C_DEPS)$(ASM_DEPS)$(EEPROM_IMAGE)$(FLASH_IMAGE)$(ELFS)$(LSS)$(S_DEPS)$(SIZEDUMMY)$(S_UPPER_DEPS) Embebidos.elf
+	-$(RM) $(OBJS)$(C_DEPS)$(ASM_DEPS)$(ELFS)$(LSS)$(S_DEPS)$(SIZEDUMMY)$(S_UPPER_DEPS) Embebidos.elf
 	-@echo ' '
 
-secondary-outputs: $(LSS) $(FLASH_IMAGE) $(EEPROM_IMAGE) $(SIZEDUMMY)
+secondary-outputs: $(LSS) $(SIZEDUMMY)
 
 .PHONY: all clean dependents
 .SECONDARY:
